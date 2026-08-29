@@ -176,11 +176,14 @@ Notes:
 - Source `common.sh`. If `HOOKS_SKIP` contains `all` or `push`, exit 0.
 - `files=$(tracked_hdl_files)`. If empty, exit 0.
 - **SystemVerilog**: if any `.sv/.v` tracked and `have_tool verilator`:
-  - File list resolution, in priority order:
-    1. `hooks.conf` key `verilator_filelist` pointing at a `.f` file, if set.
-    2. Otherwise `verilator --lint-only -Wall -Wno-fatal <all tracked sv/v>` with
-       `+incdir+` for every directory containing an `.svh/.vh`.
-  - Non-zero exit → print output, exit 1.
+  - Requires the `hooks.conf` key `verilator_filelist` to point at a
+    developer-maintained `.f` file (command-file with sources, `+incdir+`,
+    `+define+`, top module). Invocation:
+    `verilator --lint-only -Wall -f <verilator_filelist>`.
+  - If `verilator_filelist` is unset or the file does not exist → `log_warn`
+    that the SV elaboration lint is unconfigured, and pass (do not block the
+    push). CI treats the same condition as a hard failure.
+  - Non-zero `verilator` exit → print output, exit 1.
 - **VHDL**: if any `.vhd` tracked and `have_tool ghdl`:
   - `ghdl -s --std=<vhdl_std> <files>` (syntax). `ghdl_analyze=1` upgrades this
     to `ghdl -a` into a scratch workdir.
@@ -231,8 +234,9 @@ verible_lint_rules=.rules.verible_lint
 vhdl_std=08
 ghdl_analyze=0
 
-# Verilator
-verilator_filelist=
+# Verilator: path to a developer-maintained .f command file (required for
+# the pre-push SV elaboration lint; unset => step is skipped locally)
+verilator_filelist=rtl.f
 
 # vsg
 vsg_config=.vsg.yaml

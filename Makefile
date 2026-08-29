@@ -3,7 +3,7 @@ SHELL := /bin/sh
 # All tracked HDL sources, space separated.
 HDL := $(shell git ls-files '*.sv' '*.svh' '*.v' '*.vh' '*.vhd' '*.vhdl')
 
-.PHONY: install test stamp format lint
+.PHONY: install test stamp format lint elaborate
 
 install:
 	./scripts/install-hooks.sh
@@ -20,3 +20,6 @@ format:
 lint:
 	@.githooks/lib/hdl-format.sh $(HDL)
 	@.githooks/lib/hdl-lint.sh $(HDL)
+
+elaborate:
+	@printf '%s\n' $(HDL) | .githooks/lib/hdl-elaborate.sh ci

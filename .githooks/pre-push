@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+# Whole-design elaboration lint before a push. Git streams the ref updates
+# being pushed on stdin; we do not need them, but must drain stdin before
+# delegating so the pipe from git closes cleanly.
+set -u
+HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck disable=SC1091
+. "$HOOK_DIR/lib/common.sh"
+
+cat >/dev/null 2>&1 || true   # drain the ref list git passes on stdin
+
+{ skip_requested all || skip_requested push; } && exit 0
+
+files=$(tracked_hdl_files)
+[ -n "$files" ] || exit 0
+
+printf '%s\n' "$files" | "$HOOK_DIR/lib/hdl-elaborate.sh" local

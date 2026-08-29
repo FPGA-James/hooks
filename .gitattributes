@@ -1,0 +1,8 @@
+*.sv    text eol=lf
+*.svh   text eol=lf
+*.v     text eol=lf
+*.vh    text eol=lf
+*.vhd   text eol=lf
+*.vhdl  text eol=lf
+*.sh    text eol=lf
+Makefile text eol=lf

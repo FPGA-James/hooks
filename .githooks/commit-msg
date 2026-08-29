@@ -1,0 +1,35 @@
+#!/usr/bin/env sh
+# Validate the commit message against Conventional Commits.
+set -u
+HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck disable=SC1091
+. "$HOOK_DIR/lib/common.sh"
+
+[ "${commit_msg_enforce:-1}" = "1" ] || exit 0
+
+msg_file=$1
+subject=$(grep -vE '^[[:space:]]*#' "$msg_file" | grep -vE '^[[:space:]]*$' | head -n1)
+
+case $subject in
+  "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"") exit 0 ;;
+esac
+
+types='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'
+
+if ! printf '%s\n' "$subject" | grep -Eq "^(${types})(\([a-z0-9._/-]+\))?(!)?: .+"; then
+  log_error "commit message is not Conventional Commits"
+  log_error "  got:      $subject"
+  log_error "  want:     <type>(<scope>)?: <subject>   e.g. feat(uart): add parity bit"
+  log_error "  types:    ${types}"
+  exit 1
+fi
+
+body=${subject#*: }
+len=$(printf '%s' "$body" | wc -c | tr -d ' ')
+limit=${commit_msg_max_subject:-72}
+if [ "$len" -gt "$limit" ]; then
+  log_error "commit subject is ${len} characters; limit is ${limit}"
+  exit 1
+fi
+
+exit 0

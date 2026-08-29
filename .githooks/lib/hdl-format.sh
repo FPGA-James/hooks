@@ -2,6 +2,11 @@
 # Check (or, with HOOKS_AUTOFORMAT=1, apply) formatting of the given HDL files.
 # SV  -> verible-verilog-format
 # VHD -> vsg (covers style + formatting)
+#
+# stdout is a machine-readable channel: under HOOKS_AUTOFORMAT=1 it carries one
+# path per line for every file rewritten in place (same contract as
+# header-stamp.sh, so pre-commit can re-stage them). Nothing else is written to
+# stdout; all human-facing text goes to stderr via log_*.
 set -u
 HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 # shellcheck disable=SC1091
@@ -17,13 +22,27 @@ done
 
 autofmt=${HOOKS_AUTOFORMAT:-0}
 bad=''
+fmted=''
 
 if [ -n "$sv" ]; then
   if have_tool verible-verilog-format; then
     for f in $sv; do
-      if [ "$autofmt" = "1" ]; then
-        verible-verilog-format --inplace "$f"
-      elif ! verible-verilog-format "$f" | cmp -s - "$f"; then
+      if [ "$autofmt" != "1" ]; then
+        if ! verible-verilog-format "$f" | cmp -s - "$f"; then
+          bad="$bad $f"
+        fi
+      elif verible-verilog-format "$f" | cmp -s - "$f"; then
+        :  # already canonical; nothing to rewrite
+      elif ! verible-verilog-format --inplace "$f"; then
+        log_error "verible-verilog-format --inplace failed on $f"
+        bad="$bad $f"
+      elif verible-verilog-format "$f" | cmp -s - "$f"; then
+        printf '%s\n' "$f"
+        fmted="$fmted $f"
+      else
+        # --inplace reported success but the file is still not canonical:
+        # almost always a parse error (verible leaves the file untouched).
+        log_error "verible-verilog-format could not format $f (syntax error?)"
         bad="$bad $f"
       fi
     done
@@ -34,15 +53,36 @@ fi
 
 if [ -n "$vhd" ]; then
   if have_tool vsg; then
-    cfg="$REPO_ROOT/$vsg_config"
-    [ -f "$cfg" ] && cfg_arg="-c $cfg" || cfg_arg=''
+    # Build the config flag as positional parameters so a REPO_ROOT containing
+    # a space survives; "$@" is free here (the file list lives in $vhd).
+    if [ -f "$REPO_ROOT/$vsg_config" ]; then
+      set -- -c "$REPO_ROOT/$vsg_config"
+    else
+      set --
+    fi
     for f in $vhd; do
       if [ "$autofmt" = "1" ]; then
-        # shellcheck disable=SC2086
-        vsg $cfg_arg --fix -f "$f" >/dev/null 2>&1 || true
-      # shellcheck disable=SC2086
-      elif ! vsg $cfg_arg -f "$f" >/dev/null 2>&1; then
-        bad="$bad $f"
+        before=$(mktemp "${TMPDIR:-/tmp}/vsgfix.XXXXXX") || {
+          log_error "could not create a temp file to check $f"
+          bad="$bad $f"
+          continue
+        }
+        cat "$f" > "$before"
+        vsg_rc=0
+        vsg "$@" --fix -f "$f" >/dev/null 2>&1 || vsg_rc=$?
+        cmp -s "$before" "$f" || { printf '%s\n' "$f"; fmted="$fmted $f"; }
+        rm -f "$before"
+        if [ "$vsg_rc" != "0" ]; then
+          log_error "vsg --fix could not fully fix $f (violations remain)"
+          bad="$bad $f"
+        fi
+      else
+        # Keep vsg's rule report: capture it and re-emit on stderr, so stdout
+        # stays reserved for the auto-format path's machine-readable list.
+        if ! out=$(vsg "$@" -f "$f" 2>&1); then
+          bad="$bad $f"
+          printf '%s\n' "$out" >&2
+        fi
       fi
     done
   else
@@ -50,14 +90,15 @@ if [ -n "$vhd" ]; then
   fi
 fi
 
-if [ "$autofmt" = "1" ]; then
-  [ -n "$sv$vhd" ] && log_info "auto-formatted:$sv$vhd"
-  exit 0
-fi
-
 if [ -n "$bad" ]; then
-  log_error "these files are not formatted:$bad"
-  log_error "  fix with: make format   (SV: verible-verilog-format --inplace <file>)"
+  if [ "$autofmt" = "1" ]; then
+    log_error "could not auto-format:$bad"
+  else
+    log_error "these files are not formatted:$bad"
+    log_error "  fix with: make format   (SV: verible-verilog-format --inplace <file>)"
+  fi
   exit 1
 fi
+
+[ "$autofmt" = "1" ] && [ -n "$fmted" ] && log_info "auto-formatted:$fmted"
 exit 0

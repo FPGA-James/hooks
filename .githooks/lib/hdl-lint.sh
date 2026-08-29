@@ -17,12 +17,17 @@ if ! have_tool verible-verilog-lint; then
   exit 0
 fi
 
-rules_arg=''
-[ -f "$REPO_ROOT/$verible_lint_rules" ] && \
-  rules_arg="--rules_config=$REPO_ROOT/$verible_lint_rules"
+# Build the config flag as positional parameters, not a string, so a REPO_ROOT
+# containing a space survives. "$@" is free here (the file list lives in $sv,
+# which stays word-split: project convention forbids spaces in HDL paths).
+if [ -f "$REPO_ROOT/$verible_lint_rules" ]; then
+  set -- "--rules_config=$REPO_ROOT/$verible_lint_rules"
+else
+  set --
+fi
 
 # shellcheck disable=SC2086
-if ! verible-verilog-lint $rules_arg $sv; then
+if ! verible-verilog-lint "$@" $sv; then
   log_error "verible-verilog-lint reported violations (above)"
   exit 1
 fi

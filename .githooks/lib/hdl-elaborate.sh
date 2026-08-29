@@ -51,18 +51,26 @@ fi
 
 if [ -n "$vhd" ]; then
   if have_tool ghdl; then
+    run_ghdl=1
     if [ "${ghdl_analyze:-0}" = "1" ]; then
-      wd=$(mktemp -d "${TMPDIR:-/tmp}/ghdl.XXXXXX")
-      set -- -a "--workdir=$wd" "--std=$vhdl_std"
+      if wd=$(mktemp -d "${TMPDIR:-/tmp}/ghdl.XXXXXX"); then
+        trap 'rm -rf "${wd:-}"' EXIT
+        set -- -a "--workdir=$wd" "--std=$vhdl_std"
+      else
+        log_error "could not create a temporary ghdl work directory"
+        fail=1
+        run_ghdl=0
+      fi
     else
       set -- -s "--std=$vhdl_std"
     fi
-    # shellcheck disable=SC2086
-    if ! ( cd "$REPO_ROOT" && ghdl "$@" $vhd ); then
-      log_error "ghdl reported errors"
-      fail=1
+    if [ "$run_ghdl" -eq 1 ]; then
+      # shellcheck disable=SC2086
+      if ! ( cd "$REPO_ROOT" && ghdl "$@" $vhd ); then
+        log_error "ghdl reported errors"
+        fail=1
+      fi
     fi
-    [ -n "${wd:-}" ] && rm -rf "$wd"
   else
     _miss ghdl "VHDL analysis"
   fi

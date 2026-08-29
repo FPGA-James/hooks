@@ -16,7 +16,17 @@ files=$(staged_hdl_files)
 set -- $files
 
 if [ "${enable_format:-1}" = "1" ] && ! skip_requested format; then
-  "$HOOK_DIR/lib/hdl-format.sh" "$@" || exit $?
+  # Under HOOKS_AUTOFORMAT=1 the script rewrites files in place and prints each
+  # rewritten path on stdout; re-stage them so the commit gets the formatted
+  # content, and do it before lint so lint sees what will actually be committed.
+  formatted=$("$HOOK_DIR/lib/hdl-format.sh" "$@")
+  fmt_rc=$?
+  if [ -n "$formatted" ]; then
+    printf '%s\n' "$formatted" | while IFS= read -r f; do
+      [ -n "$f" ] && git add -- "$f"
+    done
+  fi
+  [ "$fmt_rc" -eq 0 ] || exit "$fmt_rc"
 fi
 
 if [ "${enable_lint:-1}" = "1" ] && ! skip_requested lint; then
@@ -24,12 +34,20 @@ if [ "${enable_lint:-1}" = "1" ] && ! skip_requested lint; then
 fi
 
 if [ "${enable_header_stamp:-1}" = "1" ] && ! skip_requested stamp; then
+  # Files that already carry unstaged edits: re-staging them after the stamp
+  # pulls those edits into this commit too (documented, not enforced — see
+  # docs/hooks.md "Caveats").
+  pre_dirty=$(git diff --name-only -- "$@")
   changed=$("$HOOK_DIR/lib/header-stamp.sh" "$@")
   if [ -n "$changed" ]; then
-    printf '%s\n' "$changed" | while IFS= read -r f; do
-      [ -n "$f" ] && git add -- "$f"
-    done
     log_info "stamped Date Updated: $(printf '%s' "$changed" | tr '\n' ' ')"
+    printf '%s\n' "$changed" | while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      git add -- "$f"
+      if printf '%s\n' "$pre_dirty" | grep -qxF -- "$f"; then
+        log_warn "pre-commit: re-staged $f — unstaged changes in it are now part of this commit (HOOKS_SKIP=stamp to avoid)"
+      fi
+    done
   fi
 fi
 

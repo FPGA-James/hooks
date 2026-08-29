@@ -42,11 +42,25 @@ run_hook() { printf '%s\n' "$1" > "$TESTDIR/MSG"; run .githooks/commit-msg "$TES
   # wc -m honours LC_CTYPE; under a C locale it degrades to byte counting, so
   # pin a UTF-8 locale that actually exists here (en_US.UTF-8 on macOS,
   # C.UTF-8 on CI) to make the character-vs-byte distinction real.
+  locale -a 2>/dev/null | grep -qiE 'utf-?8' || skip "no UTF-8 locale"
   loc=$(locale -a 2>/dev/null | grep -iE '\.(utf-?8)$' | grep -iE '^(C|en_US)\.' | head -n1)
-  [ -n "$loc" ] || loc=en_US.UTF-8
+  [ -n "$loc" ] || loc=$(locale -a 2>/dev/null | grep -iE 'utf-?8' | head -n1)
   subject=$(printf 'é%.0s' $(seq 1 72))
   printf 'feat: %s\n' "$subject" > "$TESTDIR/MSG"
   run env LC_ALL="$loc" LC_CTYPE="$loc" .githooks/commit-msg "$TESTDIR/MSG"
+  [ "$status" -eq 0 ]
+}
+
+@test "invalid: body not separated from the subject by a blank line" {
+  printf 'feat: x\nno blank line here\n' > "$TESTDIR/MSG"
+  run .githooks/commit-msg "$TESTDIR/MSG"
+  [ "$status" -eq 1 ]
+  assert_output_contains "blank line"
+}
+
+@test "valid: body separated from the subject by a blank line" {
+  printf 'feat: x\n\nProper body paragraph.\n' > "$TESTDIR/MSG"
+  run .githooks/commit-msg "$TESTDIR/MSG"
   [ "$status" -eq 0 ]
 }
 

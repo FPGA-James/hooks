@@ -20,6 +20,27 @@ setup_repo() {
   git config core.hooksPath .githooks
 }
 
+# Assertions on $output. Use these instead of a bare `[[ "$output" == *x* ]]`:
+# `[[ ]]` is a shell keyword, so on bash 3.2 (the system bash on macOS) a failing
+# one does NOT trip bats' errexit and the assertion silently passes.
+assert_output_contains() {
+  case "$output" in
+    *"$1"*) return 0 ;;
+  esac
+  printf 'expected output to contain: %s\n--- output ---\n%s\n' "$1" "$output" >&2
+  return 1
+}
+
+assert_output_missing() {
+  case "$output" in
+    *"$1"*)
+      printf 'expected output NOT to contain: %s\n--- output ---\n%s\n' "$1" "$output" >&2
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 teardown_repo() {
   cd /
   [ -n "${TESTDIR:-}" ] && rm -rf "$TESTDIR"

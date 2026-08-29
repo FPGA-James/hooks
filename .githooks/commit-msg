@@ -32,4 +32,17 @@ if [ "$len" -gt "$limit" ]; then
   exit 1
 fi
 
+# Comment lines removed and leading blank lines trimmed, so line 1 is the
+# subject and line 2 (if a body follows) must be blank.
+msg=$(grep -vE '^[[:space:]]*#' "$msg_file" | sed -e '/./,$!d')
+if printf '%s\n' "$msg" | sed -n '2,$p' | grep -qvE '^[[:space:]]*$'; then
+  line2=$(printf '%s\n' "$msg" | sed -n '2p')
+  if ! printf '%s\n' "$line2" | grep -qE '^[[:space:]]*$'; then
+    log_error "commit body must start after a blank line"
+    log_error "  line 2:   $line2"
+    log_error "  leave a blank line between the subject and the body"
+    exit 1
+  fi
+fi
+
 exit 0

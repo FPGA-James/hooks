@@ -48,6 +48,34 @@ teardown() { teardown_repo; }
   git show HEAD:m.sv | grep -q "Date Updated : $(date +%Y-%m-%d)"
 }
 
+@test "HOOKS_AUTOFORMAT commits the formatted content, not the staged original" {
+  command -v verible-verilog-format >/dev/null || skip "verible not installed"
+  printf 'module   m ;\nendmodule\n' > m.sv
+  git add m.sv
+  run env HOOKS_AUTOFORMAT=1 git commit -m "feat: add m"
+  [ "$status" -eq 0 ]
+  # m.sv must be clean in both index and worktree: the reformatted content was
+  # re-staged rather than left behind as an unstaged edit. (The fixture's own
+  # .githooks/ and hooks.conf are untracked, so scope the check to m.sv.)
+  [ -z "$(git status --porcelain -- m.sv)" ]
+  # and the committed blob must be byte-identical to verible's output
+  verible-verilog-format m.sv > "$BATS_TEST_TMPDIR/expected.sv"
+  git show HEAD:m.sv > "$BATS_TEST_TMPDIR/committed.sv"
+  cmp "$BATS_TEST_TMPDIR/expected.sv" "$BATS_TEST_TMPDIR/committed.sv"
+}
+
+@test "partial staging: stamped file is re-staged whole, with a warning" {
+  printf '// Date Updated : 2000-01-01\nmodule m; endmodule\n' > m.sv
+  git add m.sv
+  # extra edit that was deliberately NOT staged
+  printf '// Date Updated : 2000-01-01\nmodule m; endmodule\n// unstaged marker\n' > m.sv
+  run env HOOKS_SKIP=format,lint git commit -m "feat: add m"
+  [ "$status" -eq 0 ]
+  assert_output_contains "re-staged"
+  # documents the actual behaviour: the unstaged edit rode along
+  git show HEAD:m.sv | grep -q "unstaged marker"
+}
+
 @test "HOOKS_SKIP=stamp leaves the header date alone" {
   printf '// Date Updated : 2000-01-01\nmodule m; endmodule\n' > m.sv
   git add m.sv

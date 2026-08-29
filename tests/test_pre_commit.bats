@@ -36,10 +36,14 @@ teardown() { teardown_repo; }
 }
 
 @test "stamp runs even when Verible is absent" {
-  if command -v verible-verilog-format >/dev/null; then skip "verible present"; fi
+  # Point the hook's PATH at a scratch dir holding only git; verible lives in
+  # homebrew (not /usr/bin or /bin), so format/lint hit their missing-tool
+  # branch and are skipped, while header-stamp must still bump the date.
+  mkdir "$TESTDIR/nobin"
+  ln -s "$(command -v git)" "$TESTDIR/nobin/git"
   printf '// Date Updated : 2000-01-01\nmodule m; endmodule\n' > m.sv
   git add m.sv
-  run git commit -m "feat: add m"
+  run env PATH="$TESTDIR/nobin:/usr/bin:/bin" git commit -m "feat: add m"
   [ "$status" -eq 0 ]
   git show HEAD:m.sv | grep -q "Date Updated : $(date +%Y-%m-%d)"
 }
@@ -57,4 +61,6 @@ teardown() { teardown_repo; }
   git add m.sv
   run env HOOKS_SKIP=all git commit -m "feat: messy but skipped"
   [ "$status" -eq 0 ]
+  # committed verbatim: unformatted (triple space) and unstamped
+  git show HEAD:m.sv | grep -q 'module   m'
 }

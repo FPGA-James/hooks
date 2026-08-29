@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+# Format-check, lint, and header-stamp staged HDL before the commit is created.
+set -u
+HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck disable=SC1091
+. "$HOOK_DIR/lib/common.sh"
+
+skip_requested all && exit 0
+
+files=$(staged_hdl_files)
+[ -n "$files" ] || exit 0
+
+# hdl-* scripts take the list as positional args; project convention forbids
+# spaces/newlines in HDL paths (see plan Global Constraints).
+# shellcheck disable=SC2086
+set -- $files
+
+if [ "${enable_format:-1}" = "1" ] && ! skip_requested format; then
+  "$HOOK_DIR/lib/hdl-format.sh" "$@" || exit $?
+fi
+
+if [ "${enable_lint:-1}" = "1" ] && ! skip_requested lint; then
+  "$HOOK_DIR/lib/hdl-lint.sh" "$@" || exit $?
+fi
+
+if [ "${enable_header_stamp:-1}" = "1" ] && ! skip_requested stamp; then
+  changed=$("$HOOK_DIR/lib/header-stamp.sh" "$@")
+  if [ -n "$changed" ]; then
+    printf '%s\n' "$changed" | while IFS= read -r f; do
+      [ -n "$f" ] && git add -- "$f"
+    done
+    log_info "stamped Date Updated: $(printf '%s' "$changed" | tr '\n' ' ')"
+  fi
+fi
+
+exit 0

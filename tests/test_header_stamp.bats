@@ -49,6 +49,17 @@ TODAY() { date +%Y-%m-%d; }
   cmp m.sv ref
 }
 
+@test "read-only target: exit 0 with a warning on stderr, file unchanged" {
+  printf '// Date Updated : 2000-01-01\nmodule m; endmodule\n' > m.sv
+  cp m.sv ref
+  chmod 0444 m.sv
+  run .githooks/lib/header-stamp.sh m.sv
+  chmod 0644 m.sv
+  [ "$status" -eq 0 ]
+  cmp m.sv ref
+  [[ "$output" == *"could not write"* ]]
+}
+
 @test "handles multiple files, prints only the changed ones" {
   printf '// Date Updated : 2000-01-01\n' > a.sv
   printf '// Date Updated : %s\n' "$(TODAY)" > b.sv

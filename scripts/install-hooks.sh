@@ -5,8 +5,8 @@ set -eu
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 
-chmod +x .githooks/pre-commit .githooks/commit-msg .githooks/pre-push
-chmod +x .githooks/lib/*.sh
+chmod +x .githooks/pre-commit .githooks/commit-msg .githooks/pre-push 2>/dev/null || true
+chmod +x .githooks/lib/*.sh 2>/dev/null || true
 
 git config core.hooksPath .githooks
 printf 'hooks: core.hooksPath -> .githooks\n'

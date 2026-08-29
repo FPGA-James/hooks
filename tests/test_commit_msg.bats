@@ -38,6 +38,18 @@ run_hook() { printf '%s\n' "$1" > "$TESTDIR/MSG"; run .githooks/commit-msg "$TES
   [[ "$output" == *"limit"* ]]
 }
 
+@test "valid: 72 multibyte chars is within the limit (counted in characters, not bytes)" {
+  # wc -m honours LC_CTYPE; under a C locale it degrades to byte counting, so
+  # pin a UTF-8 locale that actually exists here (en_US.UTF-8 on macOS,
+  # C.UTF-8 on CI) to make the character-vs-byte distinction real.
+  loc=$(locale -a 2>/dev/null | grep -iE '\.(utf-?8)$' | grep -iE '^(C|en_US)\.' | head -n1)
+  [ -n "$loc" ] || loc=en_US.UTF-8
+  subject=$(printf 'é%.0s' $(seq 1 72))
+  printf 'feat: %s\n' "$subject" > "$TESTDIR/MSG"
+  run env LC_ALL="$loc" LC_CTYPE="$loc" .githooks/commit-msg "$TESTDIR/MSG"
+  [ "$status" -eq 0 ]
+}
+
 @test "exempt: merge commit" {
   run_hook "Merge branch 'feature/uart' into main"
   [ "$status" -eq 0 ]

@@ -22,7 +22,7 @@ for f in "$@"; do
   if cmp -s "$f" "$tmp"; then
     rm -f "$tmp"
   else
-    cat "$tmp" > "$f" && printf '%s\n' "$f"
+    cat "$tmp" > "$f" && printf '%s\n' "$f" || printf 'hooks: could not write %s\n' "$f" >&2
     rm -f "$tmp"
   fi
 done

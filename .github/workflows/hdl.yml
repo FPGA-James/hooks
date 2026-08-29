@@ -1,0 +1,36 @@
+name: hdl
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Verilator, GHDL, bats
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator ghdl bats
+
+      - name: Install Verible
+        run: |
+          set -eu
+          ver="v0.0-3946-g851d3ff4"   # bump periodically; see github.com/chipsalliance/verible/releases
+          url="https://github.com/chipsalliance/verible/releases/download/${ver}/verible-${ver}-linux-static-x86_64.tar.gz"
+          curl -fsSL "$url" | sudo tar -xz --strip-components=1 -C /usr/local
+          verible-verilog-lint --version
+
+      - name: Install vsg
+        run: pipx install vsg || pip install --user vsg
+
+      - name: Lint + format check (same as pre-commit)
+        run: make lint
+
+      - name: Elaboration lint (same as pre-push, CI mode)
+        run: make elaborate
+
+      - name: Hook test suite
+        run: make test

@@ -1,0 +1,14 @@
+# Verible SystemVerilog lint rules. One directive per line:
+#   +rule           enable
+#   -rule           disable
+#   rule=key:value  configure
+# Full list: https://chipsalliance.github.io/verible/lint.html
+# This is a conservative starting set; tune it as the project's style settles.
+-line-length
++no-tabs
++no-trailing-spaces
++parameter-name-style
++module-filename
++explicit-parameter-storage-type
++packed-dimensions-range-ordering
++generate-label-prefix

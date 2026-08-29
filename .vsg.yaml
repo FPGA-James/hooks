@@ -1,0 +1,9 @@
+# VHDL Style Guide configuration (https://vsg.readthedocs.io).
+# Only consulted when the repo contains .vhd/.vhdl files.
+rule:
+  global:
+    indent_size: 4
+  # Example project override: keep signal names lower-case (the default) but
+  # spell it out so the intent is explicit and easy to change later.
+  signal_008:
+    case: lower

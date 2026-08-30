@@ -57,14 +57,18 @@ The installer detects it is inside a submodule and points the **superproject's**
 superproject's files. Re-run `deps/hooks/scripts/install-hooks.sh` after every
 fresh clone (`git submodule update --init` does not do it).
 
-Then, at your **project root**:
+Then scaffold the project-root files:
 
 ```sh
-cp deps/hooks/examples/gitattributes .gitattributes   # stable line endings
-cp deps/hooks/examples/editorconfig  .editorconfig    # indentation
-cp deps/hooks/examples/hdl.yml       .github/workflows/hdl.yml   # CI; edit HOOKS_DIR
-echo 'include deps/hooks/hooks.mk'  >> Makefile        # make hooks-lint, hooks-format, ...
+deps/hooks/scripts/scaffold.sh
 ```
+
+This **creates or extends** `.gitattributes`, `.editorconfig` and `Makefile`
+(adding the `hooks.mk` include), and drops a `.github/workflows/hdl.yml` if you
+don't have one. It's idempotent, and the dotfile edits sit inside
+`# >>> hdl-git-hooks (managed) >>>` … `# <<< hdl-git-hooks <<<` markers, so your
+own rules outside those blocks are never touched. An existing workflow is left
+alone (merge the hook steps from `examples/hdl.yml` by hand).
 
 Put your project's `hooks.conf`, `.rules.verible_lint`, `.vsg.yaml` and `rtl.f`
 at the project root; they override the copies bundled in the submodule

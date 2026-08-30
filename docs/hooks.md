@@ -56,23 +56,27 @@ project's `hooks.conf`.
 
 ### Project scaffolding
 
-Copy these templates from the submodule into your project root:
-
 ```sh
-cp deps/hooks/examples/gitattributes  .gitattributes
-cp deps/hooks/examples/editorconfig   .editorconfig
-cp deps/hooks/examples/hdl.yml        .github/workflows/hdl.yml   # adjust HOOKS_DIR
+deps/hooks/scripts/scaffold.sh
 ```
 
-For `make` targets, add one line to your project `Makefile`:
+Run from the superproject after adding the submodule. It:
 
-```make
-include deps/hooks/hooks.mk
-```
+- **creates or extends** `.gitattributes` and `.editorconfig` at your project
+  root — the added lines live between
+  `# >>> hdl-git-hooks (managed) >>>` and `# <<< hdl-git-hooks <<<`, so a
+  re-run refreshes only that block and anything you added outside it is kept.
+  `root = true` is only written when the `.editorconfig` is created fresh.
+- **appends `include <path>/hooks.mk`** to your `Makefile` (or creates a
+  minimal one), giving you `make hooks-lint`, `hooks-format`, `hooks-stamp`,
+  `hooks-elaborate`, `hooks-install`. Paths auto-resolve to wherever you put
+  the submodule. Or skip the include: `make -f deps/hooks/hooks.mk hooks-lint`.
+- **installs `.github/workflows/hdl.yml`** (from `examples/hdl.yml`, with the
+  submodule path substituted in) *only if you don't already have one*. If you
+  do, merge the hook steps from `examples/hdl.yml` yourself.
 
-That gives you `make hooks-lint`, `hooks-format`, `hooks-stamp`,
-`hooks-elaborate`, `hooks-install` (paths auto-resolve to the submodule
-location). Or run without a Makefile: `make -f deps/hooks/hooks.mk hooks-lint`.
+It is idempotent — safe to re-run after a `git submodule update` to pick up
+template changes.
 
 The submodule keeps its own `.github/workflows/hdl.yml` (it runs its own bats
 suite); that workflow does nothing in your project — use `examples/hdl.yml`.

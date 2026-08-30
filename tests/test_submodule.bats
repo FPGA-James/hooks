@@ -24,6 +24,7 @@ vendor_into() {
   mkdir -p "$dest"
   cp -R "$HOOKS_SRC/.githooks" "$dest/"
   cp -R "$HOOKS_SRC/scripts" "$dest/"
+  cp -R "$HOOKS_SRC/examples" "$dest/"
   cp "$HOOKS_SRC/hooks.mk" "$dest/"
   for f in hooks.conf .rules.verible_lint .vsg.yaml; do
     [ -f "$HOOKS_SRC/$f" ] && cp "$HOOKS_SRC/$f" "$dest/"
@@ -145,6 +146,94 @@ EOF
   run env HOOK_DIR="$PWD/deps/hooks/.githooks" \
       sh -c '. deps/hooks/.githooks/lib/common.sh; resolve_conf .rules.verible_lint'
   [ "$output" = "$TESTROOT/proj/.rules.verible_lint" ]
+}
+
+@test "scaffold.sh creates the project-root files when absent" {
+  new_repo "$TESTROOT/proj"
+  vendor_into "$TESTROOT/proj/deps/hooks"
+  cd "$TESTROOT/proj"
+
+  run deps/hooks/scripts/scaffold.sh
+  [ "$status" -eq 0 ]
+  grep -q '>>> hdl-git-hooks (managed) >>>' .gitattributes
+  grep -q '\*.sv' .gitattributes
+  grep -q '^root = true' .editorconfig
+  grep -q '>>> hdl-git-hooks (managed) >>>' .editorconfig
+  grep -qF 'include deps/hooks/hooks.mk' Makefile
+  grep -q 'HOOKS_DIR: deps/hooks' .github/workflows/hdl.yml
+}
+
+@test "scaffold.sh is idempotent - one managed block, no duplicated lines" {
+  new_repo "$TESTROOT/proj"
+  vendor_into "$TESTROOT/proj/deps/hooks"
+  cd "$TESTROOT/proj"
+
+  deps/hooks/scripts/scaffold.sh >/dev/null
+  deps/hooks/scripts/scaffold.sh >/dev/null
+
+  [ "$(grep -c '>>> hdl-git-hooks (managed) >>>' .gitattributes)" -eq 1 ]
+  [ "$(grep -c '<<< hdl-git-hooks <<<' .gitattributes)" -eq 1 ]
+  [ "$(grep -c '^\*\.sv[[:space:]]' .gitattributes)" -eq 1 ]
+  [ "$(grep -cF 'include deps/hooks/hooks.mk' Makefile)" -eq 1 ]
+}
+
+@test "scaffold.sh keeps the project's own lines outside the managed block" {
+  new_repo "$TESTROOT/proj"
+  vendor_into "$TESTROOT/proj/deps/hooks"
+  cd "$TESTROOT/proj"
+  printf '*.bin binary\n*.hex -text\n' > .gitattributes
+  printf 'all:\n\techo hi\n' > Makefile
+
+  deps/hooks/scripts/scaffold.sh >/dev/null
+
+  grep -qF '*.bin binary' .gitattributes
+  grep -qF '*.hex -text' .gitattributes
+  grep -q '>>> hdl-git-hooks (managed) >>>' .gitattributes
+  grep -qF 'echo hi' Makefile
+  grep -qF 'include deps/hooks/hooks.mk' Makefile
+
+  # a re-run still preserves them and does not re-append the include
+  deps/hooks/scripts/scaffold.sh >/dev/null
+  grep -qF '*.bin binary' .gitattributes
+  [ "$(grep -cF 'include deps/hooks/hooks.mk' Makefile)" -eq 1 ]
+}
+
+@test "scaffold.sh strips root=true when merging into an existing .editorconfig" {
+  new_repo "$TESTROOT/proj"
+  vendor_into "$TESTROOT/proj/deps/hooks"
+  cd "$TESTROOT/proj"
+  printf 'root = true\n\n[*.py]\nindent_size = 4\n' > .editorconfig
+
+  deps/hooks/scripts/scaffold.sh >/dev/null
+
+  [ "$(grep -c '^root = true' .editorconfig)" -eq 1 ]
+  grep -q '\[\*.py\]' .editorconfig
+  grep -q 'indent_size = 2' .editorconfig
+}
+
+@test "scaffold.sh does not overwrite an existing CI workflow" {
+  new_repo "$TESTROOT/proj"
+  vendor_into "$TESTROOT/proj/deps/hooks"
+  cd "$TESTROOT/proj"
+  mkdir -p .github/workflows
+  printf 'name: mine\n' > .github/workflows/hdl.yml
+
+  run deps/hooks/scripts/scaffold.sh
+  [ "$status" -eq 0 ]
+  [ "$(cat .github/workflows/hdl.yml)" = "name: mine" ]
+  assert_output_contains "exists"
+}
+
+@test "scaffold.sh is a no-op on a standalone checkout" {
+  new_repo "$TESTROOT/solo"
+  cp -R "$HOOKS_SRC/.githooks" "$HOOKS_SRC/scripts" "$HOOKS_SRC/examples" \
+        "$HOOKS_SRC/hooks.mk" "$TESTROOT/solo/"
+  cd "$TESTROOT/solo"
+
+  run ./scripts/scaffold.sh
+  [ "$status" -eq 0 ]
+  assert_output_contains "standalone"
+  [ ! -e .gitattributes ] || ! grep -q 'hdl-git-hooks (managed)' .gitattributes
 }
 
 @test "real git submodule: installer targets the superproject, hooks fire on it" {

@@ -1,6 +1,6 @@
-# Template: copy to `.editorconfig` at your project root when you vendor this
-# hooks repo. Indentation here matches verible-verilog-format / vsg defaults so
-# editors and the hooks agree.
+# Indentation matching verible-verilog-format / vsg defaults, so editors and
+# the hooks agree. (`root = true` is dropped when this is merged into an
+# existing .editorconfig.)
 root = true
 
 [*]

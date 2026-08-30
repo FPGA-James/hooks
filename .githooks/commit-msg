@@ -8,7 +8,14 @@ HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 [ "${commit_msg_enforce:-1}" = "1" ] || exit 0
 
 msg_file=$1
-subject=$(grep -vE '^[[:space:]]*#' "$msg_file" | grep -vE '^[[:space:]]*$' | head -n1)
+
+# `git commit -v` / commit.verbose=true appends a scissors marker and the diff
+# to the message file, and strips them only AFTER this hook runs. Cut that
+# section first, mirroring git's own cleanup, so neither the subject nor the
+# body check ever sees the diff.
+msg=$(sed '/^# -\{2,\} >8 -\{2,\}/,$d' "$msg_file" | grep -vE '^[[:space:]]*#' | sed -e '/./,$!d')
+
+subject=$(printf '%s\n' "$msg" | grep -vE '^[[:space:]]*$' | head -n1)
 
 case $subject in
   "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"") exit 0 ;;
@@ -32,9 +39,9 @@ if [ "$len" -gt "$limit" ]; then
   exit 1
 fi
 
-# Comment lines removed and leading blank lines trimmed, so line 1 is the
-# subject and line 2 (if a body follows) must be blank.
-msg=$(grep -vE '^[[:space:]]*#' "$msg_file" | sed -e '/./,$!d')
+# $msg is the scissors section cut, comment lines removed and leading blank
+# lines trimmed, so line 1 is the subject and line 2 (if a body follows) must
+# be blank.
 if printf '%s\n' "$msg" | sed -n '2,$p' | grep -qvE '^[[:space:]]*$'; then
   line2=$(printf '%s\n' "$msg" | sed -n '2p')
   if ! printf '%s\n' "$line2" | grep -qE '^[[:space:]]*$'; then

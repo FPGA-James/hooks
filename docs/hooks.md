@@ -25,10 +25,12 @@ tools are present. Missing tools are skipped locally; CI enforces all of them.
 **Partial staging.** The `pre-commit` header-stamp step runs `git add` on every
 HDL file whose `Date Updated :` line it bumps. `git add` stages the *whole*
 file, so any **other** unstaged modification sitting in that file is swept into
-the commit as well. The same applies to files rewritten by
-`HOOKS_AUTOFORMAT=1`, which are re-staged so the commit contains the formatted
-content. The hook warns (`re-staged <file> — unstaged changes in it are now
-part of this commit`) but never blocks.
+the commit as well. When that happens the stamp step warns (`re-staged <file> —
+unstaged changes in it are now part of this commit`) but never blocks.
+
+`HOOKS_AUTOFORMAT=1` has the same effect for a different reason: files it
+rewrites are re-staged so the commit contains the formatted content. That
+re-stage is silent — no `re-staged` warning is printed for it.
 
 Commit HDL files whole. If you are deliberately committing only part of a file
 (`git add -p`), use `HOOKS_SKIP=stamp git commit …` and bump the header date by

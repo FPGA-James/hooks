@@ -58,6 +58,33 @@ run_hook() { printf '%s\n' "$1" > "$TESTDIR/MSG"; run .githooks/commit-msg "$TES
   assert_output_contains "blank line"
 }
 
+@test "valid: git commit -v scissors diff is not mistaken for a body" {
+  # `git commit -v` appends the scissors marker and the diff to the message file
+  # and strips them only AFTER commit-msg runs, so the hook must cut them itself.
+  # NB: git's template puts the comment block immediately after the subject
+  # line, with no blank line between them -- so once the '#' lines are stripped
+  # the first diff line lands on line 2 and looks exactly like a body.
+  {
+    printf 'feat: add thing\n'
+    printf '# Please enter the commit message for your changes. Lines starting\n'
+    printf "# with '#' will be ignored, and an empty message aborts the commit.\n"
+    printf '#\n'
+    printf '# On branch master\n'
+    printf '# ------------------------ >8 ------------------------\n'
+    printf '# Do not modify or remove the line above.\n'
+    printf '# Everything below it will be ignored.\n'
+    printf 'diff --git a/x b/x\n'
+    printf 'index e31de1f..0835e4f 100644\n'
+    printf -- '--- a/x\n'
+    printf '+++ b/x\n'
+    printf '@@ -1 +1 @@\n'
+    printf -- '-seed\n'
+    printf '+change\n'
+  } > "$TESTDIR/MSG"
+  run .githooks/commit-msg "$TESTDIR/MSG"
+  [ "$status" -eq 0 ]
+}
+
 @test "valid: body separated from the subject by a blank line" {
   printf 'feat: x\n\nProper body paragraph.\n' > "$TESTDIR/MSG"
   run .githooks/commit-msg "$TESTDIR/MSG"

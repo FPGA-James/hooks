@@ -1,25 +1,18 @@
 SHELL := /bin/sh
 
-# All tracked HDL sources, space separated.
-HDL := $(shell git ls-files '*.sv' '*.svh' '*.v' '*.vh' '*.vhd' '*.vhdl')
+# Standalone use: the hooks live at the repo root, so hooks.mk sits alongside
+# this file and `_HOOKS_DIR` resolves to `.`. The short aliases below just
+# forward to the `hooks-` targets so `make lint` etc. keep working here.
+include hooks.mk
 
 .PHONY: install test stamp format lint elaborate
 
-install:
-	./scripts/install-hooks.sh
+install:   hooks-install
 
 test:
 	bats tests/
 
-stamp:
-	@.githooks/lib/header-stamp.sh $(HDL) || true
-
-format:
-	@HOOKS_AUTOFORMAT=1 .githooks/lib/hdl-format.sh $(HDL)
-
-lint:
-	@.githooks/lib/hdl-format.sh $(HDL)
-	@.githooks/lib/hdl-lint.sh $(HDL)
-
-elaborate:
-	@printf '%s\n' $(HDL) | .githooks/lib/hdl-elaborate.sh ci
+stamp:     hooks-stamp
+format:    hooks-format
+lint:      hooks-lint
+elaborate: hooks-elaborate

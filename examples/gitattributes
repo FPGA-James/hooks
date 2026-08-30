@@ -1,0 +1,12 @@
+# Template: copy to `.gitattributes` at your project root when you vendor this
+# hooks repo. Keeps line endings stable so the formatters and stamps behave
+# identically on macOS and Linux.
+*.sv     text eol=lf
+*.svh    text eol=lf
+*.v      text eol=lf
+*.vh     text eol=lf
+*.vhd    text eol=lf
+*.vhdl   text eol=lf
+*.sh     text eol=lf
+*.f      text eol=lf
+Makefile text eol=lf

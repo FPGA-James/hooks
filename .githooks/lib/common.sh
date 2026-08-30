@@ -6,6 +6,16 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
   exit 1
 }
 
+# HOOKS_HOME is the directory that holds .githooks/ (this hook repo's root),
+# wherever it lives. Standalone it equals REPO_ROOT; vendored into a larger
+# project (e.g. a submodule at deps/hooks) it is the submodule directory.
+# Every sourcing hook/script sets HOOK_DIR to the .githooks directory first.
+if [ -n "${HOOK_DIR:-}" ] && [ -d "$HOOK_DIR" ]; then
+  HOOKS_HOME=$(CDPATH= cd -- "$HOOK_DIR/.." && pwd)
+else
+  HOOKS_HOME=$REPO_ROOT
+fi
+
 # --- configuration: defaults, then hooks.conf overrides ---------------------
 
 enable_format=1
@@ -19,10 +29,27 @@ ghdl_analyze=0
 verilator_filelist=rtl.f
 vsg_config=.vsg.yaml
 
+# Precedence: built-in defaults < hooks.conf shipped with these hooks <
+# hooks.conf at the project root. The middle layer only exists when the hooks
+# are vendored (HOOKS_HOME != REPO_ROOT); the project-root file always wins.
+if [ "$HOOKS_HOME" != "$REPO_ROOT" ] && [ -f "$HOOKS_HOME/hooks.conf" ]; then
+  # shellcheck disable=SC1091
+  . "$HOOKS_HOME/hooks.conf"
+fi
 if [ -f "$REPO_ROOT/hooks.conf" ]; then
   # shellcheck disable=SC1091
   . "$REPO_ROOT/hooks.conf"
 fi
+
+# Resolve a project config file by name: prefer the project root, fall back to
+# the copy bundled with the hooks. Echoes an absolute path, or nothing.
+resolve_conf() {
+  if [ -f "$REPO_ROOT/$1" ]; then
+    printf '%s\n' "$REPO_ROOT/$1"
+  elif [ -f "$HOOKS_HOME/$1" ]; then
+    printf '%s\n' "$HOOKS_HOME/$1"
+  fi
+}
 
 # --- logging --------------------------------------------------------------
 

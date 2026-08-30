@@ -1,0 +1,21 @@
+# Template: copy to `.editorconfig` at your project root when you vendor this
+# hooks repo. Indentation here matches verible-verilog-format / vsg defaults so
+# editors and the hooks agree.
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+
+[*.{sv,svh,v,vh}]
+indent_style = space
+indent_size = 2
+
+[*.{vhd,vhdl}]
+indent_style = space
+indent_size = 4
+
+[Makefile]
+indent_style = tab

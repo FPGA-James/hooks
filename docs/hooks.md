@@ -6,11 +6,76 @@ HDL clean and the file headers current.
 ## Install (once per clone)
 
 ```sh
-make install
+make install          # standalone repo
+# or, when vendored:  deps/hooks/scripts/install-hooks.sh
 ```
 
-This runs `git config core.hooksPath .githooks` and prints which optional
-tools are present. Missing tools are skipped locally; CI enforces all of them.
+This runs `git config core.hooksPath …` (pointing at this repo's `.githooks/`,
+wherever it sits) and prints which optional tools are present. Missing tools
+are skipped locally; CI enforces all of them. See
+[Using it as a git submodule](#using-it-as-a-git-submodule) for the vendored
+case.
+
+## Using it as a git submodule
+
+You can vendor this repo into a larger HDL project instead of copying the
+scripts. The hooks then lint, format and stamp the **enclosing project's**
+files — nothing needs to change in the hook logic, because everything keys off
+`git rev-parse --show-toplevel`, which resolves to the superproject when the
+superproject's `git commit` / `git push` fires a hook.
+
+```sh
+# path is your choice — deps/hooks, tools/hooks, third_party/hooks, ...
+git submodule add <url> deps/hooks
+deps/hooks/scripts/install-hooks.sh
+```
+
+`install-hooks.sh` detects that it lives inside a submodule and sets
+`core.hooksPath` in the **superproject** to `deps/hooks/.githooks` (relative to
+the superproject root, whatever path you chose). Like any `core.hooksPath`
+setting it lives in `.git/config`, so **every fresh clone of your project must
+re-run it** — `git submodule update --init` does not. Add a bootstrap line to
+your project README or a setup script.
+
+Requires git ≥ 2.13 (submodule detection) / ≥ 2.9 (relative `core.hooksPath`).
+
+### Project-level configuration
+
+Put these at your **project root**; they override the copies bundled in the
+submodule:
+
+| File | Purpose |
+|------|---------|
+| `hooks.conf` | feature toggles / limits — see [Configuration](#configuration) |
+| `.rules.verible_lint` | Verible lint rules (falls back to the submodule's copy) |
+| `.vsg.yaml` | vsg config (falls back to the submodule's copy) |
+| `rtl.f` | Verilator command file — **no fallback**, this is project-specific |
+
+Config precedence: built-in defaults → `deps/hooks/hooks.conf` → your
+project's `hooks.conf`.
+
+### Project scaffolding
+
+Copy these templates from the submodule into your project root:
+
+```sh
+cp deps/hooks/examples/gitattributes  .gitattributes
+cp deps/hooks/examples/editorconfig   .editorconfig
+cp deps/hooks/examples/hdl.yml        .github/workflows/hdl.yml   # adjust HOOKS_DIR
+```
+
+For `make` targets, add one line to your project `Makefile`:
+
+```make
+include deps/hooks/hooks.mk
+```
+
+That gives you `make hooks-lint`, `hooks-format`, `hooks-stamp`,
+`hooks-elaborate`, `hooks-install` (paths auto-resolve to the submodule
+location). Or run without a Makefile: `make -f deps/hooks/hooks.mk hooks-lint`.
+
+The submodule keeps its own `.github/workflows/hdl.yml` (it runs its own bats
+suite); that workflow does nothing in your project — use `examples/hdl.yml`.
 
 ## What runs when
 

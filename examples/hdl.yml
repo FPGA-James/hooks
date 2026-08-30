@@ -1,0 +1,67 @@
+# Template CI workflow for a PROJECT that vendors this hooks repo as a
+# submodule. Copy to .github/workflows/hdl.yml in your project and adjust.
+#
+# Key differences from the hooks repo's own CI:
+#   * `submodules: recursive` on checkout, so the hook scripts are present.
+#   * runs the `hooks-` targets from the included fragment (see hooks.mk).
+#   * no `make test` — that is the hooks repo's own bats suite, not yours.
+#
+# Assumes the submodule is at deps/hooks. If you put it elsewhere, change
+# HOOKS_DIR below and the `include` path in your Makefile.
+name: hdl
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HOOKS_DIR: deps/hooks
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Verilator, GHDL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator ghdl
+
+      - name: Install Verible
+        run: |
+          set -euo pipefail
+          ver="v0.0-3946-g851d3ff4"   # keep in step with $HOOKS_DIR/docs/hooks.md
+          url="https://github.com/chipsalliance/verible/releases/download/${ver}/verible-${ver}-linux-static-x86_64.tar.gz"
+          curl -fsSL "$url" | sudo tar -xz --strip-components=1 -C /usr/local
+          verible-verilog-lint --version
+
+      - name: Install vsg
+        run: |
+          set -euo pipefail
+          pipx install vsg || pip install --user vsg
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Assert toolchain present
+        run: |
+          set -euo pipefail
+          verible-verilog-format --version
+          verible-verilog-lint --version
+          vsg --version
+          verilator --version
+          ghdl --version
+
+      - name: Lint + format check (same as pre-commit)
+        run: make -f "$HOOKS_DIR/hooks.mk" hooks-lint
+
+      - name: Elaboration lint (same as pre-push, CI mode)
+        run: make -f "$HOOKS_DIR/hooks.mk" hooks-elaborate

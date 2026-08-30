@@ -17,11 +17,13 @@ if ! have_tool verible-verilog-lint; then
   exit 0
 fi
 
-# Build the config flag as positional parameters, not a string, so a REPO_ROOT
+# Build the config flag as positional parameters, not a string, so a path
 # containing a space survives. "$@" is free here (the file list lives in $sv,
 # which stays word-split: project convention forbids spaces in HDL paths).
-if [ -f "$REPO_ROOT/$verible_lint_rules" ]; then
-  set -- "--rules_config=$REPO_ROOT/$verible_lint_rules"
+# resolve_conf checks the project root first, then the bundled copy.
+rules=$(resolve_conf "$verible_lint_rules")
+if [ -n "$rules" ]; then
+  set -- "--rules_config=$rules"
 else
   set --
 fi

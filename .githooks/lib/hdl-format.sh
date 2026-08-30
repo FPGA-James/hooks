@@ -53,10 +53,12 @@ fi
 
 if [ -n "$vhd" ]; then
   if have_tool vsg; then
-    # Build the config flag as positional parameters so a REPO_ROOT containing
-    # a space survives; "$@" is free here (the file list lives in $vhd).
-    if [ -f "$REPO_ROOT/$vsg_config" ]; then
-      set -- -c "$REPO_ROOT/$vsg_config"
+    # Build the config flag as positional parameters so a path containing a
+    # space survives; "$@" is free here (the file list lives in $vhd).
+    # resolve_conf checks the project root first, then the bundled copy.
+    vsgcfg=$(resolve_conf "$vsg_config")
+    if [ -n "$vsgcfg" ]; then
+      set -- -c "$vsgcfg"
     else
       set --
     fi

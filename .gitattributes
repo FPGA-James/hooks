@@ -5,4 +5,6 @@
 *.vhd   text eol=lf
 *.vhdl  text eol=lf
 *.sh    text eol=lf
+*.f     text eol=lf
 Makefile text eol=lf
+*.mk    text eol=lf
